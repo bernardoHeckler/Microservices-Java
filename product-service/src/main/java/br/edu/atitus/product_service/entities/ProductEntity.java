@@ -29,6 +29,17 @@ public class ProductEntity {
 	
 	private Integer stock;
 	
+	@Column(name="image_url")
+	private String imageUrl;
+	
+	public String getImageUrl() {
+		return imageUrl;
+	}
+
+	public void setImageUrl(String imageUrl) {
+		this.imageUrl = imageUrl;
+	}
+
 	@Transient
 	private String enviroment;
 	
