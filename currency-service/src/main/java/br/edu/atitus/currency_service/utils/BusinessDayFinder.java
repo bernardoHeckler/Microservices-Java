@@ -57,3 +57,4 @@ public class BusinessDayFinder {
         }
     }
 }
+// Bernardo Heckler
