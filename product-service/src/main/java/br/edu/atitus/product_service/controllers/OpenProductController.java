@@ -2,12 +2,16 @@ package br.edu.atitus.product_service.controllers;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.CacheManager;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort.Direction;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
+import br.edu.atitus.product_service.ProductServiceApplication;
 import br.edu.atitus.product_service.clients.CurrencyClient;
 import br.edu.atitus.product_service.clients.CurrencyResponse;
 import br.edu.atitus.product_service.entities.ProductEntity;
@@ -17,15 +21,18 @@ import br.edu.atitus.product_service.repositories.ProductRepository;
 @RequestMapping("products")
 public class OpenProductController {
 
+    private final ProductServiceApplication productServiceApplication;
+
 	private final ProductRepository repository;
 	private final CurrencyClient currencyClient;
 	private final CacheManager cacheManager;
 
-	public OpenProductController(ProductRepository repository, CurrencyClient currencyClient, CacheManager cacheManager) {
+	public OpenProductController(ProductRepository repository, CurrencyClient currencyClient, CacheManager cacheManager, ProductServiceApplication productServiceApplication) {
 		super();
 		this.repository = repository;
 		this.currencyClient = currencyClient;
 		this.cacheManager = cacheManager;
+		this.productServiceApplication = productServiceApplication;
 	}
 	
 	@Value("${server.port}")
@@ -47,7 +54,7 @@ public class OpenProductController {
 			product = repository.findById(idProduct)
 					.orElseThrow(() -> new Exception("Product not found"));
 			
-			product.setEnviroment("Product-service running on port: " + serverPort);
+			product.setEnviroment("Product-service running on Port: " + serverPort);
 			
 			if (product.getCurrency().equals(targetCurrency)) {
 				product.setConvertedPrice(product.getPrice());
@@ -70,7 +77,33 @@ public class OpenProductController {
 			product.setEnviroment("Product-service running on port: " + serverPort + " - DataSource: cache");
 		}
 		return ResponseEntity.ok(product);
+	}
 	
+	@GetMapping("/noconverter/{idProduct}")
+	public ResponseEntity<ProductEntity> getNoConverter(@PathVariable Long idProduct) throws Exception {
+		var product = repository.findById(idProduct).orElseThrow(() -> new Exception("Produto Não Encontrado"));
+		product.setConvertedPrice(-1);
+		product.setEnviroment("Product-service running on Port: " + serverPort);
+		return ResponseEntity.ok(product);
+	}
+	
+	// Bernardo Heckler
+	
+	@GetMapping("/{targetCurrency}")
+	public ResponseEntity<Page<ProductEntity>> getAllProducts(
+		    @PathVariable String targetCurrency,
+		    @PageableDefault(page = 0, size = 5, sort = "description", direction = Direction.ASC)
+		    	Pageable pageable) throws Exception {
+		
+	    Page<ProductEntity> products = repository.findAll(pageable);
+	    for (ProductEntity product : products) {
+	        CurrencyResponse currency = currencyClient.getCurrency(product.getPrice(), product.getCurrency(), targetCurrency);
+	        
+	        product.setConvertedPrice(currency.getConvertedValue());
+	        // Setar o ambiente
+	        product.setEnviroment("Product-Service running on Port: " + serverPort + " - " + currency.getEnviroment());// + " - " + cambio.getAmbiente());
+	    }
+	    return ResponseEntity.ok(products);
 	}
 	
 }
